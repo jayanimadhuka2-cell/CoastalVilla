@@ -315,3 +315,61 @@ footer {
         font-size: 27px;
     }
 }
+
+/* CHECK AVAILABILITY */
+
+.availability-section {
+    text-align: center;
+}
+
+.availability-form {
+    max-width: 550px;
+    margin: 30px auto;
+    padding: 30px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    text-align: left;
+}
+
+.availability-form label,
+.booking-form label {
+    font-weight: bold;
+    color: #263445;
+}
+
+.availability-form input,
+.availability-form select {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    box-sizing: border-box;
+}
+
+.availability-form button {
+    padding: 13px;
+    background: #DDB653;
+    color: #101E32;
+    border: none;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.availability-form button:hover {
+    background: #c9a13e;
+}
+
+.availability-message {
+    margin: 20px auto;
+    color: #263445;
+    font-weight: bold;
+}
+
+.availability-section .room-container {
+    margin-top: 30px;
+}

@@ -19,6 +19,7 @@ $result = mysqli_query($conn, $sql);
     <div class="links">
         <a href="../index.php">Home</a>
         <a href="rooms.php">Rooms</a>
+        <a href="check-availability.php">Check Availability</a>
         <a href="../auth/login.php">Login</a>
     </div>
 </nav>

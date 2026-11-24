@@ -3,63 +3,107 @@
 require_once __DIR__ . "/../config/database.php";
 
 $message = "";
-$rooms = [];
 
-if (!isset($conn) || !$conn) {
-    $message = "Database connection error.";
-} else {
-    if ($_SERVER["REQUEST_METHOD"] == "POST") {
+$room_id = $_GET["room_id"] ?? "";
+$checkin = $_GET["checkin"] ?? "";
+$checkout = $_GET["checkout"] ?? "";
+$guests = $_GET["guests"] ?? "";
 
-        $name = $_POST["name"];
-        $email = $_POST["email"];
-        $phone = $_POST["phone"];
-        $room_id = $_POST["room_id"];
-        $checkin = $_POST["checkin"];
-        $checkout = $_POST["checkout"];
-        $guests = $_POST["guests"];
+$name = "";
+$email = "";
+$phone = "";
 
-        if ($checkout <= $checkin) {
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
-            $message = "Please select a valid checkout date!";
+    $name = trim($_POST["name"]);
+    $email = trim($_POST["email"]);
+    $phone = trim($_POST["phone"]);
+    $room_id = $_POST["room_id"];
+    $checkin = $_POST["checkin"];
+    $checkout = $_POST["checkout"];
+    $guests = $_POST["guests"];
 
-        } else {
+    if ($checkout <= $checkin || $checkin < date("Y-m-d")) {
 
-            $sql = "INSERT INTO bookings
-            (guest_name, email, phone, room_id, checkin, checkout, guests)
-            VALUES (?, ?, ?, ?, ?, ?, ?)";
+        $message = "Please select valid booking dates.";
 
-            $stmt = mysqli_prepare($conn, $sql);
+    } else {
 
-            if ($stmt) {
-            // Bind and execute query here
-            } else {
-            $message = "Booking failed!";
-            }
+        // Check whether the room is already booked
+
+        $check_sql = "SELECT booking_id FROM bookings
+                      WHERE room_id = ?
+                      AND checkin < ?
+                      AND checkout > ?
+                      AND COALESCE(status, 'Pending') <> 'Cancelled'";
+
+        $check_stmt = mysqli_prepare($conn, $check_sql);
+
+        if ($check_stmt) {
 
             mysqli_stmt_bind_param(
-                $stmt,
-                "sssissi",
-                $name,
-                $email,
-                $phone,
+                $check_stmt,
+                "iss",
                 $room_id,
-                $checkin,
                 $checkout,
-                $guests
+                $checkin
             );
 
-            if (mysqli_stmt_execute($stmt)) {
-                $message = "Booking submitted successfully!";
+            mysqli_stmt_execute($check_stmt);
+
+            $check_result = mysqli_stmt_get_result($check_stmt);
+
+            if (mysqli_num_rows($check_result) > 0) {
+
+                $message = "Sorry! This room is already booked for these dates.";
+
             } else {
-                $message = "Booking failed!";
+
+                $sql = "INSERT INTO bookings
+                (guest_name, email, phone, room_id, checkin, checkout, guests)
+                VALUES (?, ?, ?, ?, ?, ?, ?)";
+
+                $stmt = mysqli_prepare($conn, $sql);
+
+                if ($stmt) {
+
+                    mysqli_stmt_bind_param(
+                        $stmt,
+                        "sssissi",
+                        $name,
+                        $email,
+                        $phone,
+                        $room_id,
+                        $checkin,
+                        $checkout,
+                        $guests
+                    );
+
+                    if (mysqli_stmt_execute($stmt)) {
+                        $message = "Booking submitted successfully!";
+                        $name = "";
+                        $email = "";
+                        $phone = "";
+                    } else {
+                        $message = "Booking failed. Please try again.";
+                    }
+
+                    mysqli_stmt_close($stmt);
+
+                } else {
+                    $message = "Booking failed!";
+                }
             }
 
-            mysqli_stmt_close($stmt);
+            mysqli_stmt_close($check_stmt);
+
+        } else {
+            $message = "Unable to check room availability.";
         }
     }
-
-    $rooms = mysqli_query($conn, "SELECT * FROM rooms");
 }
+
+$rooms = mysqli_query($conn, "SELECT * FROM rooms ORDER BY room_id DESC");
 ?>
 
 <!DOCTYPE html>
@@ -67,12 +111,18 @@ if (!isset($conn) || !$conn) {
 <head>
     <title>Ceylonora - Room Booking</title>
     <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/guest.css">
 </head>
 <body>
 
 <nav>
     <h2>Ceylonora</h2>
-    <a href="../index.php">Home</a>
+
+    <div class="links">
+        <a href="../index.php">Home</a>
+        <a href="rooms.php">Rooms</a>
+        <a href="check-availability.php">Check Availability</a>
+    </div>
 </nav>
 
 <section class="section">
@@ -80,42 +130,78 @@ if (!isset($conn) || !$conn) {
     <h1>Book Your Room</h1>
     <p>Enter your booking details below.</p>
 
-    <p><?php echo htmlspecialchars($message); ?></p>
+    <p class="availability-message">
+        <?php echo htmlspecialchars($message); ?>
+    </p>
 
     <form class="booking-form" method="POST">
 
-        <input type="text" name="name"
-               placeholder="Full Name" required>
+        <input type="text"
+               name="name"
+               placeholder="Full Name"
+               value="<?php echo htmlspecialchars($name); ?>"
+               required>
 
-        <input type="email" name="email"
-               placeholder="Email Address" required>
+        <input type="email"
+               name="email"
+               placeholder="Email Address"
+               value="<?php echo htmlspecialchars($email); ?>"
+               required>
 
-        <input type="tel" name="phone"
-               placeholder="Phone Number" required>
+        <input type="tel"
+               name="phone"
+               placeholder="Phone Number"
+               value="<?php echo htmlspecialchars($phone); ?>"
+               required>
+
+        <label>Select Room</label>
 
         <select name="room_id" required>
             <option value="">Select Room</option>
 
             <?php while ($room = mysqli_fetch_assoc($rooms)) { ?>
-                <option value="<?php echo $room['room_id']; ?>">
+
+                <option value="<?php echo $room['room_id']; ?>"
+                    <?php echo ($room_id == $room['room_id']) ? "selected" : ""; ?>>
+
                     <?php echo htmlspecialchars($room['room_name']); ?>
+
                 </option>
+
             <?php } ?>
 
         </select>
 
         <label>Check-in Date</label>
-        <input type="date" name="checkin" required>
+        <input type="date"
+               name="checkin"
+               min="<?php echo date('Y-m-d'); ?>"
+               value="<?php echo htmlspecialchars($checkin); ?>"
+               required>
 
         <label>Check-out Date</label>
-        <input type="date" name="checkout" required>
+        <input type="date"
+               name="checkout"
+               min="<?php echo date('Y-m-d', strtotime('+1 day')); ?>"
+               value="<?php echo htmlspecialchars($checkout); ?>"
+               required>
+
+        <label>Number of Guests</label>
 
         <select name="guests" required>
             <option value="">Number of Guests</option>
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
+
+            <?php for ($i = 1; $i <= 4; $i++) { ?>
+
+                <option value="<?php echo $i; ?>"
+                    <?php echo ($guests == $i) ? "selected" : ""; ?>>
+
+                    <?php echo $i; ?>
+
+                </option>
+
+            <?php } ?>
+
         </select>
 
         <button type="submit">Submit Booking</button>
